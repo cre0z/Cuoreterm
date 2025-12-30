@@ -1,24 +1,9 @@
 #include <stdint.h> // uint32_t, uint8_t
+#include "cuoreterm.h"
 #include "kfont.h"
 
 #define FONT_W 8
 #define FONT_H 14
-
-struct framebuffer {
-    void    *addr;
-    uint32_t width;
-    uint32_t height;
-    uint32_t pitch;
-    uint32_t bpp;
-};
-
-struct terminal {
-    struct framebuffer *fb;
-    uint32_t cursor_x;
-    uint32_t cursor_y;
-    uint32_t cols;
-    uint32_t rows;
-};
 
 // memory helpers
 
@@ -48,25 +33,25 @@ static void *h_memmove(void *dst, const void *src, uint32_t n) {
 // fb/glyph code
 
 static void fb_put_pixel(
-    struct framebuffer *fb,
+    struct terminal *term,
     uint32_t x,
     uint32_t y,
     uint32_t color
 ) {
-    if (x >= fb->width || y >= fb->height)
+    if (x >= term->fb_width || y >= term->fb_height)
         return;
 
-    uint32_t bpp = fb->bpp / 8;
+    uint32_t bpp = term->fb_bpp / 8;
     uint8_t *p =
-        (uint8_t *)fb->addr +
-        y * fb->pitch +
+        (uint8_t *)term->fb_addr +
+        y * term->fb_pitch +
         x * bpp;
 
     *(uint32_t *)p = color;
 }
 
 static void draw_glyph(
-    struct framebuffer *fb,
+    struct terminal *term,
     uint32_t x,
     uint32_t y,
     const uint8_t *glyph,
@@ -79,7 +64,7 @@ static void draw_glyph(
         for (uint32_t c = 0; c < 8; c++) {
             uint32_t color =
                 (bits & (1 << (7 - c))) ? fg : bg;
-            fb_put_pixel(fb, x + c, y + r, color);
+            fb_put_pixel(term, x + c, y + r, color);
         }
     }
 }
@@ -89,33 +74,43 @@ static void draw_glyph(
 // cuoreterm_draw_char
 // cuoreterm_write
 
-void cuoreterm_init(struct terminal *term, struct framebuffer *fb) {
-    term->fb = fb;
+void cuoreterm_init(struct terminal *term,
+                    void *fb_addr,
+                    uint32_t fb_width,
+                    uint32_t fb_height,
+                    uint32_t fb_pitch,
+                    uint32_t fb_bpp)
+{
+    term->fb_addr      = fb_addr;
+    term->fb_width  = fb_width;
+    term->fb_height = fb_height;
+    term->fb_pitch  = fb_pitch;
+    term->fb_bpp    = fb_bpp;
+
     term->cursor_x = 0;
     term->cursor_y = 0;
-    term->cols = fb->width  / FONT_W;
-    term->rows = fb->height / FONT_H;
+    term->cols = fb_width  / FONT_W;
+    term->rows = fb_height / FONT_H;
 }
 
 static void term_scroll(struct terminal *term) {
-    struct framebuffer *fb = term->fb;
-
-    uint32_t row_bytes = fb->pitch * FONT_H;
-    uint32_t total = fb->pitch * fb->height;
+    uint32_t row_bytes = term->fb_pitch * FONT_H;
+    uint32_t total     = term->fb_pitch * term->fb_height;
 
     h_memmove(
-        fb->addr,
-        (uint8_t *)fb->addr + row_bytes,
+        term->fb_addr,
+        (uint8_t *)term->fb_addr + row_bytes,
         total - row_bytes
     );
 
     h_memset(
-        (uint8_t *)fb->addr + total - row_bytes,
+        (uint8_t *)term->fb_addr + total - row_bytes,
         0,
         row_bytes
     );
 
-    term->cursor_y--;
+    if (term->cursor_y > 0)
+        term->cursor_y--;
 }
 
 void cuoreterm_draw_char(
@@ -138,7 +133,7 @@ void cuoreterm_draw_char(
     const uint8_t *glyph =
         iso10_f14_psf + 4 + ((uint8_t)c * FONT_H);
 
-    draw_glyph(term->fb, px, py, glyph, FONT_H, fg, bg);
+    draw_glyph(term, px, py, glyph, FONT_H, fg, bg);
 
     term->cursor_x++;
     if (term->cursor_x >= term->cols) {
@@ -178,7 +173,7 @@ void cuoreterm_write(void *ctx, const char *msg, uint32_t len) {
                 iso10_f14_psf + 4 + (' ' * FONT_H);
 
             draw_glyph(
-                term->fb,
+                term,
                 px,
                 py,
                 glyph,
