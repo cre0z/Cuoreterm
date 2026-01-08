@@ -18,6 +18,10 @@ struct terminal {
     uint32_t cursor_y;
     uint32_t cols;
     uint32_t rows;
+
+    const uint8_t *font_data; // pointer to PSF font
+    uint32_t font_width;
+    uint32_t font_height;
 };
 
 void cuoreterm_init(
@@ -26,7 +30,10 @@ void cuoreterm_init(
     uint32_t fb_width,
     uint32_t fb_height,
     uint32_t fb_pitch,
-    uint32_t fb_bpp
+    uint32_t fb_bpp,
+    const uint8_t *font,
+    uint32_t font_w,
+    uint32_t font_h
 );
 
 void cuoreterm_write(void *ctx, const char *msg, uint64_t len);
@@ -36,6 +43,15 @@ void cuoreterm_draw_char(
     uint32_t fg,
     uint32_t bg
 );
+
+void cuoreterm_set_font(
+    struct terminal *term,
+    const uint8_t *font,
+    uint32_t font_w,
+    uint32_t font_h
+);
+
+void cuoreterm_clear(struct terminal *term);
 
 #ifdef __cplusplus
 }

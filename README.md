@@ -1,7 +1,7 @@
 # CuoreTerm
 a very simple terminal for amd64 limine
 
-## Example (AMD64/Limine)
+## Example (in c)
 ```c
 #include "cuoreterm.h"
 #include "limine.h" // from https://codeberg.org/Limine/limine-protocol/
@@ -22,12 +22,22 @@ void _start(void) {
          (uint32_t)fb->width,
          (uint32_t)fb->height,
          (uint32_t)fb->pitch,
-         (uint32_t)fb->bpp
+         (uint32_t)fb->bpp,
+         iso10_f14_psf, // font we provide for you in kfont.h but can be any psf1 font
+         8, // font width
+         14 // font height
     );
+
+    // optionally clear the screen
+    cuoreterm_clear(&fb_term);
 
     // print hello world
     char msg[] = "hello world :3";
     cuoreterm_write(&fb_term, msg, sizeof(msg));
+
+    // optionally change font (PSF1 font)
+    // cuoreterm_set_font(&fb_term, your_own_cute_font, font_width, font_height);
+    // cuoreterm_write(&fb_term, "new font :3", 11);
 
     for (;;)
         __asm__("hlt");

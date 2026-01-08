@@ -1,9 +1,5 @@
 #include <stdint.h> // uint32_t, uint8_t
 #include "cuoreterm.h"
-#include "kfont.h"
-
-#define FONT_W 8
-#define FONT_H 14
 
 // memory helpers
 
@@ -74,14 +70,18 @@ static void draw_glyph(
 // cuoreterm_draw_char
 // cuoreterm_write
 
-void cuoreterm_init(struct terminal *term,
-                    void *fb_addr,
-                    uint32_t fb_width,
-                    uint32_t fb_height,
-                    uint32_t fb_pitch,
-                    uint32_t fb_bpp)
-{
-    term->fb_addr      = fb_addr;
+void cuoreterm_init(
+    struct terminal *term,
+    void *fb_addr,
+    uint32_t fb_width,
+    uint32_t fb_height,
+    uint32_t fb_pitch,
+    uint32_t fb_bpp,
+    const uint8_t *font,
+    uint32_t font_w,
+    uint32_t font_h
+) {
+    term->fb_addr   = fb_addr;
     term->fb_width  = fb_width;
     term->fb_height = fb_height;
     term->fb_pitch  = fb_pitch;
@@ -89,12 +89,15 @@ void cuoreterm_init(struct terminal *term,
 
     term->cursor_x = 0;
     term->cursor_y = 0;
-    term->cols = fb_width  / FONT_W;
-    term->rows = fb_height / FONT_H;
+    term->font_data   = font;
+    term->font_width  = font_w;
+    term->font_height = font_h;
+    term->cols = fb_width  / font_w;
+    term->rows = fb_height / font_h;
 }
 
 static void term_scroll(struct terminal *term) {
-    uint32_t row_bytes = term->fb_pitch * FONT_H;
+    uint32_t row_bytes = term->fb_pitch * term->font_height;
     uint32_t total     = term->fb_pitch * term->fb_height;
 
     h_memmove(
@@ -127,13 +130,13 @@ void cuoreterm_draw_char(
         return;
     }
 
-    uint32_t px = term->cursor_x * FONT_W;
-    uint32_t py = term->cursor_y * FONT_H;
+    uint32_t px = term->cursor_x * term->font_width;
+    uint32_t py = term->cursor_y * term->font_height;
 
     const uint8_t *glyph =
-        iso10_f14_psf + 4 + ((uint8_t)c * FONT_H);
+        term->font_data + 4 + ((uint8_t)c * term->font_height);
 
-    draw_glyph(term, px, py, glyph, FONT_H, fg, bg);
+    draw_glyph(term, px, py, glyph, term->font_height, fg, bg);
 
     term->cursor_x++;
     if (term->cursor_x >= term->cols) {
@@ -166,20 +169,20 @@ void cuoreterm_write(void *ctx, const char *msg, uint64_t len) {
                 term->cursor_x--;
             }
 
-            uint32_t px = term->cursor_x * FONT_W;
-            uint32_t py = term->cursor_y * FONT_H;
+            uint32_t px = term->cursor_x * term->font_width;
+            uint32_t py = term->cursor_y * term->font_height;
 
             const uint8_t *glyph =
-                iso10_f14_psf + 4 + (' ' * FONT_H);
+                term->font_data + 4 + (' ' * term->font_height);
 
             draw_glyph(
                 term,
                 px,
                 py,
                 glyph,
-                FONT_H,
-                0x00FFFFFF,
-                0x00000000
+                term->font_height,
+                0x00FFFFFF,   // fg
+                0x00000000    // bg
             );
         }
         else {
@@ -191,4 +194,25 @@ void cuoreterm_write(void *ctx, const char *msg, uint64_t len) {
             );
         }
     }
+}
+
+void cuoreterm_set_font(
+    struct terminal *term,
+    const uint8_t *font,
+    uint32_t font_w,
+    uint32_t font_h
+) {
+    term->font_data   = font;
+    term->font_width  = font_w;
+    term->font_height = font_h;
+    term->cols = term->fb_width / font_w;
+    term->rows = term->fb_height / font_h;
+}
+
+void cuoreterm_clear(struct terminal *term) {
+    uint32_t total_bytes = term->fb_pitch * term->fb_height;
+    h_memset(term->fb_addr, 0x00, total_bytes);
+
+    term->cursor_x = 0;
+    term->cursor_y = 0;
 }
