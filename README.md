@@ -23,6 +23,12 @@ void _start(void) {
          (uint32_t)fb->height,
          (uint32_t)fb->pitch,
          (uint32_t)fb->bpp,
+         fb->red_mask_shift,
+         fb->green_mask_shift,
+         fb->blue_mask_shift,
+         fb->red_mask_size,
+         fb->green_mask_size,
+         fb->blue_mask_size,
          iso10_f14_psf, // font we provide for you in kfont.h but can be any psf1 font
          8, // font width
          14 // font height
@@ -31,9 +37,9 @@ void _start(void) {
     // optionally clear the screen
     cuoreterm_clear(&fb_term);
 
-    // print hello world
-    char msg[] = "hello world :3";
-    cuoreterm_write(&fb_term, msg, sizeof(msg));
+    // print hello world in green
+    char msg[] = "\x1b[#00FF00mhello world :3\x1b[0m";
+    cuoreterm_write(&fb_term, msg, sizeof(msg) - 1);
 
     // optionally change font (PSF1 font)
     // cuoreterm_set_font(&fb_term, your_own_cute_font, font_width, font_height);
