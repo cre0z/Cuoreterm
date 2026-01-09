@@ -210,7 +210,7 @@ void handle_ansi(struct terminal * term, char **p_c, int *i)
 
     // this technically allows '\x1b[30;30;30;30;30;30;30;30;30m' but whatever
     if (*c == ';') {
-        handle_ansi(term, c, i);
+        handle_ansi(term, p_c, i);
     }
 }
 
