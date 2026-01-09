@@ -265,8 +265,8 @@ void cuoreterm_write(void *ctx, const char *msg, uint64_t len) {
             cuoreterm_draw_char(
                 term,
                 c,
-                0x00FFFFFF,
-                0x00000000
+                term->fgcol,
+                term->bgcol
             );
         }
     }
