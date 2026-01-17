@@ -1,9 +1,64 @@
+#ifndef CUORETERM_H
+#define CUORETERM_H
+
 #include <stdint.h>
 #include <stdbool.h>
-#include "cuoreterm.h"
 
-// memory helpers
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+struct terminal {
+    void *fb_addr;
+    uint32_t fb_width;
+    uint32_t fb_height;
+    uint32_t fb_pitch;
+    uint32_t fb_bpp;
+
+    uint8_t red_shift;
+    uint8_t green_shift;
+    uint8_t blue_shift;
+    uint8_t red_size;
+    uint8_t green_size;
+    uint8_t blue_size;
+
+    uint32_t fgcol;
+
+    uint32_t cursor_x;
+    uint32_t cursor_y;
+
+    const uint8_t *font_data;
+    uint32_t font_width;
+    uint32_t font_height;
+    uint32_t cols;
+    uint32_t rows;
+};
+
+void cuoreterm_init(
+    struct terminal *term,
+    void *fb_addr,
+    uint32_t fb_width,
+    uint32_t fb_height,
+    uint32_t fb_pitch,
+    uint32_t fb_bpp,
+    uint8_t r_shift, uint8_t g_shift, uint8_t b_shift,
+    uint8_t r_size,  uint8_t g_size,  uint8_t b_size,
+    const uint8_t *font,
+    uint32_t font_w,
+    uint32_t font_h
+);
+
+void cuoreterm_write(void *ctx, const char *msg, uint64_t len);
+void cuoreterm_draw_char(struct terminal *term, char c, uint32_t fg);
+void cuoreterm_set_font(struct terminal *term, const uint8_t *font, uint32_t font_w, uint32_t font_h);
+void cuoreterm_clear(struct terminal *term);
+
+#ifdef __cplusplus
+}
+#endif
+
+
+#ifdef CUORETERM_IMPL
 static void *h_memset(void *dst, uint8_t v, uint32_t n) {
     uint8_t *p = (uint8_t *)dst;
     while (n--) *p++ = v;
@@ -13,7 +68,6 @@ static void *h_memset(void *dst, uint8_t v, uint32_t n) {
 static void *h_memmove(void *dst, const void *src, uint32_t n) {
     uint8_t *d = (uint8_t *)dst;
     const uint8_t *s = (const uint8_t *)src;
-
     if (d < s) {
         while (n--) *d++ = *s++;
     } else {
@@ -23,8 +77,6 @@ static void *h_memmove(void *dst, const void *src, uint32_t n) {
     }
     return dst;
 }
-
-// fb / glyph
 
 static uint32_t fb_pack_color(struct terminal *term, uint32_t rgb) {
     uint32_t r = (rgb >> 16) & 0xFF;
@@ -42,7 +94,6 @@ static uint32_t fb_pack_color(struct terminal *term, uint32_t rgb) {
 
 static void fb_put_pixel(struct terminal *term, uint32_t x, uint32_t y, uint32_t color) {
     if (x >= term->fb_width || y >= term->fb_height) return;
-
     uint32_t pixel = fb_pack_color(term, color);
     uint32_t bpp = term->fb_bpp / 8;
     uint8_t *p = (uint8_t *)term->fb_addr + y * term->fb_pitch + x * bpp;
@@ -68,8 +119,6 @@ static void draw_glyph(struct terminal *term, uint32_t x, uint32_t y,
     }
 }
 
-
-// init
 void cuoreterm_init(
     struct terminal *term,
     void *fb_addr,
@@ -132,7 +181,6 @@ void cuoreterm_draw_char(struct terminal *term, char c, uint32_t fg) {
     uint32_t py = term->cursor_y * term->font_height;
 
     const uint8_t *glyph = term->font_data + 4 + ((uint8_t)c * term->font_height);
-
     draw_glyph(term, px, py, glyph, term->font_height, fg);
 
     term->cursor_x++;
@@ -142,9 +190,6 @@ void cuoreterm_draw_char(struct terminal *term, char c, uint32_t fg) {
         if (term->cursor_y >= term->rows) term_scroll(term);
     }
 }
-
-// color support (a mix of ansi and hex color codes)
-// example: "\x1b[#FF0000mthis is red\x1b[0m and this is white\n",
 
 static uint32_t hex_digit(char c) {
     if (c >= '0' && c <= '9') return (uint32_t)(c - '0');
@@ -181,7 +226,6 @@ static void handle_hex_ansi(struct terminal *term, char **p_c) {
     *p_c = c;
 }
 
-// write text
 void cuoreterm_write(void *ctx, const char *msg, uint64_t len) {
     struct terminal *term = (struct terminal *)ctx;
     char *p_c = (char *)msg;
@@ -207,7 +251,6 @@ void cuoreterm_write(void *ctx, const char *msg, uint64_t len) {
             uint32_t px = term->cursor_x * term->font_width;
             uint32_t py = term->cursor_y * term->font_height;
 
-            // hard erase cell (no bg support, no font dependency)
             for (uint32_t y = 0; y < term->font_height; y++) {
                 for (uint32_t x = 0; x < term->font_width; x++) {
                     fb_put_pixel(term, px + x, py + y, 0x000000);
@@ -224,7 +267,6 @@ void cuoreterm_write(void *ctx, const char *msg, uint64_t len) {
     }
 }
 
-// runtime font switching
 void cuoreterm_set_font(struct terminal *term, const uint8_t *font, uint32_t font_w, uint32_t font_h) {
     term->font_data   = font;
     term->font_width  = font_w;
@@ -233,10 +275,11 @@ void cuoreterm_set_font(struct terminal *term, const uint8_t *font, uint32_t fon
     term->rows = term->fb_height / font_h;
 }
 
-// clear all text on screen
 void cuoreterm_clear(struct terminal *term) {
-    uint32_t total_bytes = term->fb_pitch * term->fb_height;
-    h_memset(term->fb_addr, 0x00, total_bytes);
+    h_memset(term->fb_addr, 0x00, term->fb_pitch * term->fb_height);
     term->cursor_x = 0;
     term->cursor_y = 0;
 }
+
+#endif // CUORETERM_IMPL
+#endif // CUORETERM_H

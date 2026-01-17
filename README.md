@@ -3,8 +3,11 @@ a very simple terminal for amd64 limine
 
 ## Example (in c)
 ```c
-#include "cuoreterm.h"
-#include "limine.h" // from https://codeberg.org/Limine/limine-protocol/
+#define CUORETERM_IMPL // enable cuoreterm source code instead of just includes (in other source files do not do this, so should only do this once preferably in your entry)
+#include "Cuoreterm.h"
+#include "kfont.h" // font we provide you (iso10_f14_psf)
+
+#include "limine.h" // from https://codeberg.org/Limine/limine-protocol/ (is not included here)
 
 static volatile struct limine_framebuffer_request fb_req = {
     .id = LIMINE_FRAMEBUFFER_REQUEST_ID,
