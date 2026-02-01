@@ -1,21 +1,12 @@
 # CuoreTerm
 a very simple terminal for amd64 limine
 
-## Examples
-
-It's recommended to provide CuoreTerm with heap allocation functions with the following macros:
+## Example
 
 ```c
-#define CUORETERM_MALLOC(bytes) kmalloc(bytes)
-#define CUORETERM_FREE(addr) kfree(addr)
-```
+#define CUORETERM_IMPL // enable cuoreterm source code instead of just includes (in other source files do not do this
+// #define CUORETERM_DATASEG_BACKBUFFER // use a backbuffer from .bss (useful if you do not want to provide your own malloc,free) (unrecommended)
 
-If you do not provide these macros however, CuoreTerm will allocate a backbuffer on the stack, assuming a resolution of 1280x720.
-
-```c
-#define CUORETERM_MALLOC(bytes) kmalloc(bytes) // OPTIONAL
-#define CUORETERM_FREE(addr) kfree(addr) // OPTIONAL
-#define CUORETERM_IMPL // enable cuoreterm source code instead of just includes (in other source files do not do this, so should only do this once preferably in your entry)
 #include "Cuoreterm.h"
 #include "kfont.h" // font we provide you (iso10_f14_psf)
 
@@ -28,21 +19,33 @@ static volatile struct limine_framebuffer_request fb_req = {
 
 struct terminal fb_term;
 
+// you will need to provide both of these functions (only if you arent using CUORETERM_DATASEG_BACKBUFFER)
+// should be a heap allocator (also make sure there is enough space on the heap for the backbuffer)
+void* malloc(size_t size);
+void free(void* user_ptr);
+
 void _start(void) {
     struct limine_framebuffer *fb = fb_req.response->framebuffers[0];
 
     cuoreterm_init(
          &fb_term,
          (void *)fb->address,
+         (uint32_t) fb->pitch,
          (uint32_t)fb->width,
          (uint32_t)fb->height,
          (uint32_t)fb->bpp,
+         (uint8_t) fb->red_mask_shift, (uint8_t) fb->green_mask_shift, (uint8_t) fb->blue_mask_shift,
          iso10_f14_psf, // font we provide for you in kfont.h but can be any psf1 font
          8, // font width
          14 // font height
+         #ifndef CUORETERM_DATASEG_BACKBUFFER
+             ,
+             &malloc,
+             &free
+         #endif
     );
 
-    // optionally clear the screen
+    // clear the screen (not required after init, just used here for demonstration purposes)
     cuoreterm_clear(&fb_term);
 
     // print hello world in green
