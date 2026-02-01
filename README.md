@@ -1,8 +1,20 @@
 # CuoreTerm
 a very simple terminal for amd64 limine
 
-## Example (in c)
+## Examples
+
+It's recommended to provide CuoreTerm with heap allocation functions with the following macros:
+
 ```c
+#define CUORETERM_MALLOC(bytes) kmalloc(bytes)
+#define CUORETERM_FREE(addr) kfree(addr)
+```
+
+If you do not provide these macros however, CuoreTerm will allocate a backbuffer on the stack, assuming a resolution of 1280x720.
+
+```c
+#define CUORETERM_MALLOC(bytes) kmalloc(bytes) // OPTIONAL
+#define CUORETERM_FREE(addr) kfree(addr) // OPTIONAL
 #define CUORETERM_IMPL // enable cuoreterm source code instead of just includes (in other source files do not do this, so should only do this once preferably in your entry)
 #include "Cuoreterm.h"
 #include "kfont.h" // font we provide you (iso10_f14_psf)
@@ -24,7 +36,6 @@ void _start(void) {
          (void *)fb->address,
          (uint32_t)fb->width,
          (uint32_t)fb->height,
-         (uint32_t)fb->pitch,
          (uint32_t)fb->bpp,
          iso10_f14_psf, // font we provide for you in kfont.h but can be any psf1 font
          8, // font width
